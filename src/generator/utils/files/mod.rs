@@ -11,6 +11,10 @@ use img_parts::{
 };
 use structopt::clap::crate_version;
 
+pub use self::writer::FileWriter;
+
+mod writer;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum FileFormat {
 	PNG,
