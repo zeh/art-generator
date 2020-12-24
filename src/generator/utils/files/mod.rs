@@ -11,8 +11,10 @@ use img_parts::{
 };
 use structopt::clap::crate_version;
 
+pub use self::encoder::FileEncoder;
 pub use self::writer::FileWriter;
 
+mod encoder;
 mod writer;
 
 #[derive(Clone, Debug, PartialEq)]
