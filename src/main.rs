@@ -13,7 +13,7 @@ use generator::utils::parsing::{
 };
 use generator::utils::random::get_random_seed;
 use generator::utils::units::{Margins, SizeUnit, WeightedValue};
-use generator::{Generator, ProcessCallbackResult};
+use generator::ProcessCallbackResult;
 
 mod generator;
 
@@ -160,47 +160,8 @@ struct Opt {
 	margins: Margins<SizeUnit>,
 }
 
-fn get_options() -> Opt {
-	return Opt::from_args();
-}
-
-fn on_processed(generator: &Generator, result: ProcessCallbackResult) {
-	if result.is_success {
-		// Create basic image file data
-		let options = get_options();
-		let output_path = options.output.as_path();
-
-		if options.no_metadata {
-			// No metadata wanted, write the file directly
-			files::write_image(generator.get_current(), output_path);
-		} else {
-			// Write the file with metadata
-
-			// Define new metadata
-			let mut comments = vec![
-				format!(
-					"Produced {} generations after {} tries in {:.3}s ({:.3}ms avg per try); the final difference from target is {:.2}%.",
-					result.num_generations,
-					result.num_tries,
-					result.time_elapsed,
-					result.time_elapsed / (result.num_tries as f32) * 1000.0,
-					result.diff * 100.0
-				),
-				format!("Command line: {}", env::args().collect::<Vec<String>>().join(" ")),
-			];
-
-			// Add painter-specific metadata
-			for (key, value) in result.metadata {
-				comments.push(format!("{}: {}", key, value));
-			}
-
-			files::write_image_with_metadata(generator.get_current(), output_path, comments);
-		}
-	}
-}
-
 fn main() {
-	let options = get_options();
+	let options = Opt::from_args();
 
 	// Target
 	let target_file = options.target.as_path();
@@ -222,7 +183,7 @@ fn main() {
 
 	// Set input
 	match options.input {
-		Some(input) => {
+		Some(ref input) => {
 			let input_file = input.as_path();
 			let input_image = image::open(input_file).expect("Cannot open input file {:?}, exiting");
 
@@ -259,72 +220,107 @@ fn main() {
 	};
 	println!("RNG seed is {}.", rng_seed);
 
+	// Result handler
+	let on_processed = |result: ProcessCallbackResult| {
+		if result.is_success {
+			// Create basic image file data
+			let output_path = options.output.as_path();
+
+			if options.no_metadata {
+				// No metadata wanted, write the file directly
+				files::write_image(result.image.clone(), output_path);
+			} else {
+				// Write the file with metadata
+
+				// Define new metadata
+				let mut comments = vec![
+					format!(
+						"Produced {} generations after {} tries in {:.3}s ({:.3}ms avg per try); the final difference from target is {:.2}%.",
+						result.num_generations,
+						result.num_tries,
+						result.time_elapsed,
+						result.time_elapsed / (result.num_tries as f32) * 1000.0,
+						result.diff * 100.0
+					),
+					format!("Command line: {}", env::args().collect::<Vec<String>>().join(" ")),
+				];
+
+				// Add painter-specific metadata
+				for (key, value) in result.metadata {
+					comments.push(format!("{}: {}", key, value));
+				}
+
+				files::write_image_with_metadata(result.image.clone(), output_path, comments);
+			}
+		}
+	};
+
 	// Process everything
 	// TODO: use actual enums here and use a single object from trait (can't seen to make it work)
 	// TODO: error out on passed painter options that are unused?
 	match &options.painter[..] {
 		"circles" => {
 			let mut painter = CirclePainter::new();
-			painter.options.alpha = options.painter_alpha;
+			painter.options.alpha = options.painter_alpha.clone();
 			painter.options.alpha_bias = options.painter_alpha_bias;
-			painter.options.radius = options.painter_radius;
+			painter.options.radius = options.painter_radius.clone();
 			painter.options.radius_bias = options.painter_radius_bias;
 			painter.options.anti_alias = !options.painter_disable_anti_alias;
 			painter.options.color_seed = options.color_seed;
 			painter.options.rng_seed = rng_seed;
-			painter.options.margins = options.margins;
+			painter.options.margins = options.margins.clone();
 			gen.process(
 				options.max_tries,
 				options.generations,
 				options.diff,
 				candidates,
 				painter,
-				Some(on_processed),
+				Some(&on_processed),
 			);
 		}
 		"rects" => {
 			let mut painter = RectPainter::new();
-			painter.options.alpha = options.painter_alpha;
+			painter.options.alpha = options.painter_alpha.clone();
 			painter.options.alpha_bias = options.painter_alpha_bias;
-			painter.options.width = options.painter_width;
+			painter.options.width = options.painter_width.clone();
 			painter.options.width_bias = options.painter_width_bias;
-			painter.options.height = options.painter_height;
+			painter.options.height = options.painter_height.clone();
 			painter.options.height_bias = options.painter_height_bias;
 			painter.options.color_seed = options.color_seed;
 			painter.options.rng_seed = rng_seed;
-			painter.options.margins = options.margins;
+			painter.options.margins = options.margins.clone();
 			gen.process(
 				options.max_tries,
 				options.generations,
 				options.diff,
 				candidates,
 				painter,
-				Some(on_processed),
+				Some(&on_processed),
 			);
 		}
 		"strokes" => {
 			let mut painter = StrokePainter::new();
-			painter.options.alpha = options.painter_alpha;
+			painter.options.alpha = options.painter_alpha.clone();
 			painter.options.alpha_bias = options.painter_alpha_bias;
-			painter.options.width = options.painter_width;
+			painter.options.width = options.painter_width.clone();
 			painter.options.width_bias = options.painter_width_bias;
-			painter.options.height = options.painter_height;
+			painter.options.height = options.painter_height.clone();
 			painter.options.height_bias = options.painter_height_bias;
-			painter.options.wave_height = options.painter_wave_height;
+			painter.options.wave_height = options.painter_wave_height.clone();
 			painter.options.wave_height_bias = options.painter_wave_height_bias;
-			painter.options.wave_length = options.painter_wave_length;
+			painter.options.wave_length = options.painter_wave_length.clone();
 			painter.options.wave_length_bias = options.painter_wave_length_bias;
 			painter.options.anti_alias = !options.painter_disable_anti_alias;
 			painter.options.color_seed = options.color_seed;
 			painter.options.rng_seed = rng_seed;
-			painter.options.margins = options.margins;
+			painter.options.margins = options.margins.clone();
 			gen.process(
 				options.max_tries,
 				options.generations,
 				options.diff,
 				candidates,
 				painter,
-				Some(on_processed),
+				Some(&on_processed),
 			);
 		}
 		_ => unreachable!(),

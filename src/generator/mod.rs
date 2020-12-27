@@ -23,7 +23,7 @@ pub enum ProcessResult {
 	Error(String),
 }
 
-pub struct ProcessCallbackResult {
+pub struct ProcessCallbackResult<'a> {
 	pub is_success: bool,
 	pub is_final: bool,
 	pub num_tries: u32,
@@ -31,9 +31,8 @@ pub struct ProcessCallbackResult {
 	pub diff: f64,
 	pub time_elapsed: f32,
 	pub metadata: HashMap<String, String>,
+	pub image: &'a RgbImage,
 }
-
-type ProcessCallback = fn(generator: &Generator, result: ProcessCallbackResult);
 
 /// A definition for the image generation. This will contain all data needed for a generation process.
 pub struct Generator {
@@ -82,7 +81,7 @@ impl Generator {
 		target_diff: f64,
 		candidates: usize,
 		painter: impl Painter + Send + Sync + 'static,
-		cb: Option<ProcessCallback>,
+		cb: Option<&dyn Fn(ProcessCallbackResult)>,
 	) {
 		let mut curr_diff = diff(&self.current, &self.target);
 
@@ -219,18 +218,16 @@ impl Generator {
 				|| (target_diff > 0.0 && curr_diff <= target_diff);
 
 			if let Some(process_callback) = cb {
-				process_callback(
-					&self,
-					ProcessCallbackResult {
-						is_success: used,
-						is_final: finished,
-						num_tries: curr_tries,
-						num_generations: curr_generations,
-						diff: curr_diff,
-						time_elapsed: time_started.elapsed().as_secs_f32(),
-						metadata: arc_painter.get_metadata(),
-					},
-				);
+				process_callback(ProcessCallbackResult {
+					is_success: used,
+					is_final: finished,
+					num_tries: curr_tries,
+					num_generations: curr_generations,
+					diff: curr_diff,
+					time_elapsed: time_started.elapsed().as_secs_f32(),
+					metadata: arc_painter.get_metadata(),
+					image: &self.current,
+				});
 			}
 
 			// Update time stats for tries
@@ -317,9 +314,5 @@ impl Generator {
 			curr_generations as f64 / curr_tries as f64 * 100.0
 		);
 		println!("The final difference from target is {:.2}%.", final_diff * 100.0);
-	}
-
-	pub fn get_current(&self) -> RgbImage {
-		return self.current.clone();
 	}
 }
