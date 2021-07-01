@@ -7,6 +7,7 @@ use structopt::StructOpt;
 
 use generator::painter::{circle::CirclePainter, rect::RectPainter, stroke::StrokePainter};
 use generator::utils::files;
+use generator::utils::files::FileWriter;
 use generator::utils::parsing::{
 	parse_color, parse_color_matrix, parse_scale, parse_size_margins, parse_weighted_float_pair,
 	parse_weighted_size_pair,
@@ -220,6 +221,8 @@ fn main() {
 	};
 	println!("RNG seed is {}.", rng_seed);
 
+	let file_writer = FileWriter::new();
+
 	// Result handler
 	let on_processed = |result: ProcessCallbackResult| {
 		if result.is_success {
@@ -228,7 +231,10 @@ fn main() {
 
 			if options.no_metadata {
 				// No metadata wanted, write the file directly
-				files::write_image(result.image.clone(), output_path);
+				file_writer.push_bytes(
+					output_path.to_path_buf(),
+					files::generate_image(result.image.clone(), output_path),
+				);
 			} else {
 				// Write the file with metadata
 
@@ -250,7 +256,10 @@ fn main() {
 					comments.push(format!("{}: {}", key, value));
 				}
 
-				files::write_image_with_metadata(result.image.clone(), output_path, comments);
+				file_writer.push_bytes(
+					output_path.to_path_buf(),
+					files::generate_image_with_metadata(result.image.clone(), output_path, comments),
+				);
 			}
 		}
 	};
